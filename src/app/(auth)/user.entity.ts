@@ -10,4 +10,6 @@ export interface User {
 }
 
 export type UserInsert = Omit<User, "created_at">;
-export type UserUpdate = Partial<Omit<User, "id" | "created_at">>;
+export type UserUpdate = Partial<
+  Omit<User, "id" | "email" | "created_at">
+>;
