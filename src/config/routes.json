@@ -1,0 +1,3 @@
+{
+  "unguarded": ["/login", "/register", "/forgot-password", "/join"]
+}
