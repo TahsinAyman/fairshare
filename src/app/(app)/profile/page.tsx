@@ -27,7 +27,7 @@ export default async function ProfilePage() {
   const user = profileResult.data;
 
   async function updateProfileAction(
-    formData: FormData
+    formData: FormData,
   ): Promise<ActionResult> {
     "use server";
 
@@ -56,7 +56,9 @@ export default async function ProfilePage() {
     return result;
   }
 
-  async function saveAvatarUrlAction(url: string): Promise<ActionResult> {
+  async function uploadAvatarAction(
+    formData: FormData,
+  ): Promise<ActionResult & { avatarUrl?: string }> {
     "use server";
 
     const repo = new ProfileRepository();
@@ -67,11 +69,21 @@ export default async function ProfilePage() {
       return { success: false, error: "You must be logged in." };
     }
 
+    const file = formData.get("avatar") as File;
+
+    if (!file || !(file instanceof File)) {
+      return { success: false, error: "No file provided." };
+    }
+
     const result = await safeAction(async () => {
-      await profileService.saveAvatarUrl(repo, currentUser.id, url);
+      return profileService.uploadAvatar(repo, currentUser.id, file);
     });
 
-    return result;
+    if (!result.success) {
+      return result;
+    }
+
+    return { success: true, data: undefined, avatarUrl: result.data.publicUrl };
   }
 
   async function deleteAccountAction(): Promise<ActionResult> {
@@ -99,9 +111,8 @@ export default async function ProfilePage() {
   return (
     <ProfileView
       user={user}
-      userId={authUser.id}
       onUpdateProfile={updateProfileAction}
-      onSaveAvatarUrl={saveAvatarUrlAction}
+      onUploadAvatar={uploadAvatarAction}
       onDeleteAccount={deleteAccountAction}
     />
   );

@@ -7,6 +7,8 @@ export interface IProfileRepository {
 
   updateAvatarUrl(userId: string, url: string): Promise<User>;
 
+  uploadAvatar(userId: string, file: File): Promise<string>;
+
   deleteAccount(userId: string): Promise<void>;
 
   getUserGroupIds(userId: string): Promise<string[]>;

@@ -2,7 +2,6 @@
 
 import { useState, useRef } from "react";
 import { useFormStatus } from "react-dom";
-import { createClient } from "@/lib/supabase/client";
 import type { User } from "@/app/(auth)/user.entity";
 import type { ActionResult } from "@/lib/utils/errors";
 
@@ -75,9 +74,10 @@ function getInitials(name: string): string {
 
 export interface ProfileViewProps {
   user: User;
-  userId: string;
   onUpdateProfile: (formData: FormData) => Promise<ActionResult>;
-  onSaveAvatarUrl: (url: string) => Promise<ActionResult>;
+  onUploadAvatar: (
+    formData: FormData,
+  ) => Promise<ActionResult & { avatarUrl?: string }>;
   onDeleteAccount: () => Promise<ActionResult>;
 }
 
@@ -86,9 +86,8 @@ const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
 
 export function ProfileView({
   user,
-  userId,
   onUpdateProfile,
-  onSaveAvatarUrl,
+  onUploadAvatar,
   onDeleteAccount,
 }: ProfileViewProps) {
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -103,7 +102,7 @@ export function ProfileView({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -125,36 +124,17 @@ export function ProfileView({
     setAvatarUploading(true);
 
     try {
-      // Upload client-side to Supabase Storage
-      const supabase = createClient();
-      const ext = file.name.split(".").pop() || "jpg";
-      const path = `avatars/${userId}.${ext}`;
+      // Create FormData and send to controller
+      const formData = new FormData();
+      formData.append("avatar", file);
 
-      const { error: uploadError } = await supabase.storage
-        .from("user-assets")
-        .upload(path, file, {
-          upsert: true,
-          contentType: file.type,
-        });
-
-      if (uploadError) {
-        setAvatarError(uploadError.message);
-        setAvatarUploading(false);
-        return;
-      }
-
-      // Get public URL
-      const { data } = supabase.storage.from("user-assets").getPublicUrl(path);
-      const publicUrl = data.publicUrl;
-
-      // Save URL via server action
-      const result = await onSaveAvatarUrl(publicUrl);
+      const result = await onUploadAvatar(formData);
 
       if (!result.success) {
         setAvatarError(result.error);
-      } else {
+      } else if (result.avatarUrl) {
         // Update local state with cache-busting
-        setCurrentAvatarUrl(`${publicUrl}?t=${Date.now()}`);
+        setCurrentAvatarUrl(`${result.avatarUrl}?t=${Date.now()}`);
       }
     } catch {
       setAvatarError("Failed to upload avatar.");

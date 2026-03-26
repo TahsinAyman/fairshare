@@ -83,9 +83,31 @@ export class ProfileRepository implements IProfileRepository {
     }
 
     const userBalance = data?.find(
-      (b: { user_id: string; net_amount: number }) => b.user_id === userId
+      (b: { user_id: string; net_amount: number }) => b.user_id === userId,
     );
 
     return userBalance?.net_amount ?? 0;
+  }
+
+  async uploadAvatar(userId: string, file: File): Promise<string> {
+    const supabase = await createClient();
+
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `avatars/${userId}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("user-assets")
+      .upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+
+    if (uploadError) {
+      throw new DatabaseError(uploadError.message, uploadError);
+    }
+
+    const { data } = supabase.storage.from("user-assets").getPublicUrl(path);
+
+    return data.publicUrl;
   }
 }

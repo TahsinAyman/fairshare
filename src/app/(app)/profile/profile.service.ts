@@ -1,10 +1,13 @@
-You have a place. Actually copilot. This one. import { ValidationError } from "@/lib/utils/errors";
+import { ValidationError } from "@/lib/utils/errors";
 import type { IProfileRepository } from "./profile.repository.interface";
 import type { User, UserUpdate } from "@/app/(auth)/user.entity";
 
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
+
 export async function getProfile(
   repo: IProfileRepository,
-  userId: string
+  userId: string,
 ): Promise<User> {
   const profile = await repo.getUserById(userId);
 
@@ -18,7 +21,7 @@ export async function getProfile(
 export async function updateProfile(
   repo: IProfileRepository,
   userId: string,
-  updates: UserUpdate
+  updates: UserUpdate,
 ): Promise<User> {
   // Validate name if provided
   if (updates.full_name !== undefined) {
@@ -49,7 +52,7 @@ export async function updateProfile(
 export async function saveAvatarUrl(
   repo: IProfileRepository,
   userId: string,
-  url: string
+  url: string,
 ): Promise<User> {
   if (!url || url.trim().length === 0) {
     throw new ValidationError("Avatar URL cannot be empty.");
@@ -60,7 +63,7 @@ export async function saveAvatarUrl(
 
 export async function requestAccountDeletion(
   repo: IProfileRepository,
-  userId: string
+  userId: string,
 ): Promise<void> {
   // Get all groups the user is a member of
   const groupIds = await repo.getUserGroupIds(userId);
@@ -70,10 +73,34 @@ export async function requestAccountDeletion(
     const netBalance = await repo.getGroupNetBalance(groupId, userId);
     if (netBalance !== 0) {
       throw new ValidationError(
-        "You have unsettled debts. Please settle all expenses before deleting your account."
+        "You have unsettled debts. Please settle all expenses before deleting your account.",
       );
     }
   }
 
   await repo.deleteAccount(userId);
+}
+
+export async function uploadAvatar(
+  repo: IProfileRepository,
+  userId: string,
+  file: File,
+): Promise<{ user: User; publicUrl: string }> {
+  // Validate MIME type
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    throw new ValidationError("Avatar must be a JPG, PNG, or WebP image.");
+  }
+
+  // Validate file size
+  if (file.size > MAX_FILE_SIZE) {
+    throw new ValidationError("Avatar must be smaller than 3MB.");
+  }
+
+  // Upload file and get public URL
+  const publicUrl = await repo.uploadAvatar(userId, file);
+
+  // Save URL to database
+  const user = await repo.updateAvatarUrl(userId, publicUrl);
+
+  return { user, publicUrl };
 }
